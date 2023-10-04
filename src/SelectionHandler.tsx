@@ -1,7 +1,8 @@
 import React, { FC } from 'react';
 import { HandlerPos } from './handler-pos';
-import { ReactComponent as QuoteLeft } from "../assets/quote-left.svg";
-import { ReactComponent as QuoteRight } from "../assets/quote-right.svg";
+import QuoteLeft from "./quote-left.svg";
+import QuoteRight from "./quote-right.svg";
+import './index.css';
 
 export const SelectionHandler: FC<{
   pos: HandlerPos | null;

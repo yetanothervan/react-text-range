@@ -1,7 +1,8 @@
 {
     "transform": {
         "^.+\\.(t|j)sx?$": "ts-jest",
-        "^.+\\.svg$": "<rootDir>/svgTransform.js"
+        "^.+\\.svg$": "<rootDir>/jestcfg/svgTransform.js",
+        ".css$": "<rootDir>/jestcfg/cssTransform.js"
     },
     "testRegex": "(/tests/.*|(\\.|/)(test|spec))\\.(jsx?|tsx?)$",
     "moduleFileExtensions": [

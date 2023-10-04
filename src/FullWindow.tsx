@@ -1,4 +1,5 @@
 import React, { FC } from 'react';
+import './index.css';
 
 const fullWindow: React.CSSProperties = {
   height: '100vh',
