@@ -1,4 +1,2 @@
-import FullWindow from "./FullWindow";
-import TextSelectionZone from "./TextSelectionZone";
-
-export { FullWindow, TextSelectionZone }
+import { TextContainer, RangeState, ReactTextRange } from "./ReactTextRange";
+export { RangeState, TextContainer, ReactTextRange };

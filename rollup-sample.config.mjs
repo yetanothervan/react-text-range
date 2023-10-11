@@ -3,7 +3,7 @@ import postcss from "rollup-plugin-postcss";
 import svgr from '@svgr/rollup';
 import packageJson from "./package.json" assert { type: "json" };
 import dts from "rollup-plugin-dts";
-import peerDepsExternal from 'rollup-plugin-peer-deps-external';
+// import peerDepsExternal from 'rollup-plugin-peer-deps-external';
 import { babel } from '@rollup/plugin-babel';
 import nodeResolve from '@rollup/plugin-node-resolve';
 import commonjs from '@rollup/plugin-commonjs';
@@ -16,7 +16,7 @@ const NODE_ENV = process.env.NODE_ENV || "development";
 
 export default [
     {
-        input: 'src/index.ts',
+        input: 'src/index-sample.tsx',
         output: [
             {
                 file: packageJson.main,
@@ -28,9 +28,9 @@ export default [
                 format: 'esm',
                 sourcemap: false,
             },
-        ],
+        ],       
         plugins: [
-            peerDepsExternal(),
+            // peerDepsExternal(),
             replace({
                 "process.env.NODE_ENV": JSON.stringify(NODE_ENV),
                 preventAssignment: true,
@@ -58,7 +58,7 @@ export default [
                 exclude: "node_modules/**"
             }),
         ],
-        external: ['react']
+        // external: ['react']
     },
     {
         input: 'dist/esm/index.d.ts',

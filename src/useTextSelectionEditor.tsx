@@ -1,9 +1,10 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { HandlerPos } from './handler-pos';
+import { Rect } from './rect';
 
 declare global {
   interface Document {
-      caretPositionFromPoint: any;
+    caretPositionFromPoint: any;
   }
 }
 
@@ -11,9 +12,11 @@ const getHandlerRect = (index: number, node: Node): DOMRect | null => {
   const range = document.createRange();
   range.setStart(node, index);
   range.setEnd(node, index);
-  const rects = range.getClientRects();
-  if (rects.length === 1) {
-    return rects[0];
+  if (range.getClientRects) {
+    const rects = range.getClientRects();
+    if (rects.length >= 1) {
+      return rects[0];
+    }
   }
   return null;
 }
@@ -22,7 +25,11 @@ const getAllRects = (node: Node, start: number, end: number) => {
   const range = document.createRange();
   range.setStart(node, start);
   range.setEnd(node, end);
-  return range.getClientRects();
+  if (range.getClientRects) {
+    return range.getClientRects();
+  } else {
+    return new DOMRectList();
+  }
 }
 
 interface NodeAndOffset {
@@ -41,8 +48,10 @@ const getNodeAndOffsetFromPoint = (x: number, y: number): NodeAndOffset | null =
     offset = range.offset;
   } else if (document.caretRangeFromPoint) {
     range = document.caretRangeFromPoint(x, y);
-    textNode = range.startContainer;
-    offset = range.startOffset;
+    if (range) {
+      textNode = range.startContainer;
+      offset = range.startOffset;
+    }
   } else {
     return null;
   }
@@ -64,7 +73,7 @@ export const useTextSelectionEditor = (
     React.MutableRefObject<HTMLDivElement | null>,
     HandlerPos | null,
     HandlerPos | null,
-    DOMRectList | null] => {
+    Rect[] | null] => {
 
   // left handler pos
   const [leftHandler, setLeftHandler] = useState<HandlerPos | null>(null);
@@ -76,10 +85,16 @@ export const useTextSelectionEditor = (
 
   const [currentRightPos, setCurrentRightPos] = useState<number>(initRightPos);
 
-  const [rects, setRects] = useState<DOMRectList | null>(null);
+  const [rects, setRects] = useState<Rect[] | null>(null);
 
   // reference
   const textDiv = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (textDiv.current) {
+      textDiv.current.style.position = 'relative';
+    }
+  }, [textDiv])
 
   // mouse move handler
 
@@ -141,10 +156,12 @@ export const useTextSelectionEditor = (
         setLeftHandler(null);
         setRects(null);
       } else {
+        const divRect = textDiv.current.getBoundingClientRect();
         setLeftHandler({
           height: rect.height,
-          left: rect.left,
-          top: rect.top,
+          left: rect.left - divRect.left,
+          top: rect.top - divRect.top,
+          pos: currentLeftPos,
         });
       }
     }
@@ -161,10 +178,12 @@ export const useTextSelectionEditor = (
         setRightHandler(null);
         setRects(null);
       } else {
+        const divRect = textDiv.current.getBoundingClientRect();
         setRightHandler({
           height: rect.height,
-          left: rect.left,
-          top: rect.top,
+          left: rect.left - divRect.left,
+          top: rect.top - divRect.top,
+          pos: currentRightPos,
         });
       }
     }
@@ -173,7 +192,32 @@ export const useTextSelectionEditor = (
 
   useEffect(() => {
     const n = textDiv.current?.childNodes[0];
-    if (n) setRects(getAllRects(n, currentLeftPos, currentRightPos));
+    if (!n) {
+      setRects(null);
+      return;
+    }
+
+    const rawRects = getAllRects(n, currentLeftPos, currentRightPos);
+
+    let rectArray: Rect[] = [];
+
+    if (rawRects && textDiv.current) {
+
+      const divRect = textDiv.current.getBoundingClientRect();
+
+      for (let i = 0; i < rawRects.length; ++i) {
+        const aa = rawRects.item(i);
+        if (aa) rectArray.push({
+          height: aa.height,
+          left: aa.left - divRect.left,
+          top: aa.top - divRect.top,
+          width: aa.width,
+        });
+      }
+    }
+
+    setRects(rectArray);
+
   }, [currentLeftPos, currentRightPos])
 
   // return

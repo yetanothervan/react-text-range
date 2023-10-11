@@ -1,11 +1,6 @@
-# react-text-range
+import React, { FunctionComponent, useState } from 'react';
+import * as ReactDOMClient from 'react-dom/client';
 
-![cast](https://github.com/yetanothervan/react-text-range/assets/5338279/a6b79ef7-3cc1-4724-9ac4-1163e2f26fc1)
-
-## using
-
-```js
-// ...
 import { TextContainer, RangeState, ReactTextRange } from "./ReactTextRange";
 
 const MyTextContainer: TextContainer = React.forwardRef(({ children }, ref) =>
@@ -22,7 +17,7 @@ const MyTextContainer: TextContainer = React.forwardRef(({ children }, ref) =>
 );
 
 const App: FunctionComponent = () => {
-    const [myPos, setMyPos] = useState<RangeState>({ left: 23, right: 37 })
+    const [myPos, setMyPos] = useState<RangeState>({ left: 23, right: 47 })
     return (
         <div style={{ margin: 20 }}>
             <ReactTextRange initLeftPos={23} initRightPos={47}
@@ -40,4 +35,14 @@ here and there`}
         </div>
     )
 }
-```
+
+const render = () => {
+    let elem = document.getElementById("root");
+    const root = ReactDOMClient.createRoot(elem!);
+    root.render(
+        <React.StrictMode>
+            <App />
+        </React.StrictMode>
+    );
+};
+render();
