@@ -20,6 +20,7 @@ export const ReactTextRange: FC<{
   children: string,
   onChange: (state: RangeState) => void,
   props?: React.CSSProperties,
+  className?: string,
   selectionColor?: string,
   handlerWidth?: number,
 }> = ({
@@ -31,6 +32,7 @@ export const ReactTextRange: FC<{
   props,
   selectionColor,
   handlerWidth,
+  className,
 }) => {
 
     const [mouseOnLeft, setMouseOnLeft] = useState<boolean>(false);
@@ -52,6 +54,7 @@ export const ReactTextRange: FC<{
 
     return (
       <div
+        className={className}
         draggable={false}
         style={{
           position: 'relative',
