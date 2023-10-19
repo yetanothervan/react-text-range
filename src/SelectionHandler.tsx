@@ -11,14 +11,15 @@ export const SelectionHandler: FC<{
   left: boolean;
   bgColor?: string;
   width?: number;
-}> = ({ pos, grab, setGrab, left, bgColor, width }) => {
+  className?: string, 
+}> = ({ pos, grab, setGrab, left, bgColor, width, className }) => {
   const bgColorDef = bgColor ?? 'rgb(253 224 71)';
   const widthDef = width ?? 25;
   return (
     pos &&
     <div
       draggable={false}
-      className={`${left ? 'rounded-l-md' : 'rounded-r-md'}`}
+      className={`${left ? 'rounded-l-md' : 'rounded-r-md'} ${className}`}
       style={{
         position: 'absolute',
         display: 'flex',
@@ -29,8 +30,6 @@ export const SelectionHandler: FC<{
         cursor: grab ? 'grabbing' : 'grab',
         alignItems: left ? 'flex-start' : 'flex-end',
         backgroundColor: bgColorDef,
-        opacity: .8,
-        // transform: 'scale(.5)'
       }}
       onMouseDown={() => {
         setGrab(true);

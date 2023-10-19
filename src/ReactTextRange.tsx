@@ -23,6 +23,8 @@ export const ReactTextRange: FC<{
   className?: string,
   selectionColor?: string,
   handlerWidth?: number,
+  leftHandlerClass?: string,
+  rightHandlerClass?: string,
 }> = ({
   initLeftPos,
   initRightPos,
@@ -33,6 +35,8 @@ export const ReactTextRange: FC<{
   selectionColor,
   handlerWidth,
   className,
+  leftHandlerClass,
+  rightHandlerClass,
 }) => {
 
     const [mouseOnLeft, setMouseOnLeft] = useState<boolean>(false);
@@ -65,8 +69,8 @@ export const ReactTextRange: FC<{
         <Container ref={textDiv}>
           {children}
         </Container>
-        <SelectionHandler bgColor={bgColor} width={handlerWidth} grab={mouseOnLeft} left={true} pos={leftHandler} setGrab={(v) => setMouseOnLeft(v)} />
-        <SelectionHandler bgColor={bgColor} width={handlerWidth} grab={mouseOnRight} left={false} pos={rightHandler} setGrab={(v) => setMouseOnRight(v)} />
+        <SelectionHandler className={leftHandlerClass} bgColor={bgColor} width={handlerWidth} grab={mouseOnLeft} left={true} pos={leftHandler} setGrab={(v) => setMouseOnLeft(v)} />
+        <SelectionHandler className={rightHandlerClass} bgColor={bgColor} width={handlerWidth} grab={mouseOnRight} left={false} pos={rightHandler} setGrab={(v) => setMouseOnRight(v)} />
       </div>
     );
   };
