@@ -9,11 +9,9 @@ export const SelectionHandler: FC<{
   grab: boolean;
   setGrab: (value: boolean) => void;
   left: boolean;
-  bgColor?: string;
   width?: number;
-  className?: string, 
-}> = ({ pos, grab, setGrab, left, bgColor, width, className }) => {
-  const bgColorDef = bgColor ?? 'rgb(253 224 71)';
+  className?: string,
+}> = ({ pos, grab, setGrab, left, width, className }) => {
   const widthDef = width ?? 25;
   return (
     pos &&
@@ -29,7 +27,6 @@ export const SelectionHandler: FC<{
         height: pos.height,
         cursor: grab ? 'grabbing' : 'grab',
         alignItems: left ? 'flex-start' : 'flex-end',
-        backgroundColor: bgColorDef,
       }}
       onMouseDown={() => {
         setGrab(true);
