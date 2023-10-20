@@ -1,6 +1,6 @@
 # react-text-range
 
-![cast](https://github.com/yetanothervan/react-text-range/assets/5338279/a6b79ef7-3cc1-4724-9ac4-1163e2f26fc1)
+![cast2](https://github.com/yetanothervan/react-text-range/assets/5338279/f5977266-4de9-412f-8f8c-e7639e8d6bc8)
 
 ## using
 
