@@ -4,14 +4,7 @@ import * as ReactDOMClient from 'react-dom/client';
 import { TextContainer, RangeState, ReactTextRange } from "./ReactTextRange";
 
 const MyTextContainer: TextContainer = React.forwardRef(({ children }, ref) =>
-    <div ref={ref} style={{
-        fontSize: 24,
-        width: '320px',
-        backgroundColor: 'rgba(253, 224, 71, .2)',
-        userSelect: 'none',
-        padding: '20px',
-        whiteSpace: 'pre-wrap',
-    }}>
+    <div ref={ref} className="text-2xl text-gray-300 w-80 bg-yellow-100 select-none p-5 whitespace-pre-wrap">
         {children}
     </div>
 );
@@ -22,8 +15,9 @@ const App: FunctionComponent = () => {
         <div style={{ margin: 20 }}>
             <ReactTextRange initLeftPos={23} initRightPos={47}
                 Container={MyTextContainer} onChange={setMyPos}
-                selectionColor='yellow' handlerWidth={18}>{
-                    `Some text
+                handlerWidth={18}
+                selectionClass='bg-yellow-300 text-black'
+            >{`Some text
 or even some real good multiline text
 here and there`}
             </ReactTextRange>

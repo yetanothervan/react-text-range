@@ -2,7 +2,6 @@ import { FC, useEffect, useState } from 'react';
 import { useTextSelectionEditor } from './useTextSelectionEditor';
 import { SelectionHandler } from './SelectionHandler';
 import React from 'react';
-import { Rect } from './rect';
 
 export type TextContainer = React.ForwardRefExoticComponent<{
   children: React.ReactNode;
@@ -21,10 +20,12 @@ export const ReactTextRange: FC<{
   onChange: (state: RangeState) => void,
   props?: React.CSSProperties,
   className?: string,
-  selectionColor?: string,
   handlerWidth?: number,
   leftHandlerClass?: string,
   rightHandlerClass?: string,
+  headClass?: string,
+  selectionClass?: string,
+  tailClass?: string,
 }> = ({
   initLeftPos,
   initRightPos,
@@ -32,18 +33,21 @@ export const ReactTextRange: FC<{
   children,
   onChange,
   props,
-  selectionColor,
   handlerWidth,
   className,
   leftHandlerClass,
   rightHandlerClass,
+  headClass,
+  selectionClass,
+  tailClass,
 }) => {
 
     const [mouseOnLeft, setMouseOnLeft] = useState<boolean>(false);
 
     const [mouseOnRight, setMouseOnRight] = useState<boolean>(false);
 
-    const [textDiv, leftHandler, rightHandler, rects] = useTextSelectionEditor(initLeftPos, initRightPos, mouseOnLeft, mouseOnRight);
+    const [textDiv, leftHandler, rightHandler] =
+      useTextSelectionEditor(initLeftPos, initRightPos, mouseOnLeft, mouseOnRight, headClass, selectionClass, tailClass);
 
     useEffect(() => {
       if (leftHandler && rightHandler) {
@@ -54,8 +58,6 @@ export const ReactTextRange: FC<{
       }
     }, [leftHandler, rightHandler]);
 
-    const bgColor = selectionColor;
-
     return (
       <div
         className={className}
@@ -65,39 +67,13 @@ export const ReactTextRange: FC<{
           ...props
         }}
       >
-        <SelectionRects rects={rects} bgColor={bgColor} />
         <Container ref={textDiv}>
           {children}
         </Container>
-        <SelectionHandler className={leftHandlerClass} bgColor={bgColor} width={handlerWidth} grab={mouseOnLeft} left={true} pos={leftHandler} setGrab={(v) => setMouseOnLeft(v)} />
-        <SelectionHandler className={rightHandlerClass} bgColor={bgColor} width={handlerWidth} grab={mouseOnRight} left={false} pos={rightHandler} setGrab={(v) => setMouseOnRight(v)} />
+        <SelectionHandler className={leftHandlerClass} width={handlerWidth} grab={mouseOnLeft} left={true} pos={leftHandler} setGrab={(v) => setMouseOnLeft(v)} />
+        <SelectionHandler className={rightHandlerClass} width={handlerWidth} grab={mouseOnRight} left={false} pos={rightHandler} setGrab={(v) => setMouseOnRight(v)} />
       </div>
     );
   };
-
-const SelectionRects: FC<{ rects: Rect[] | null, bgColor?: string }> = ({ rects, bgColor }) => {
-
-  if (!rects) return null;
-  return (
-    <>
-      {rects.map((d, i) => <SelectionRect key={i} rect={d} bgColor={bgColor} />)}
-    </>
-  )
-}
-
-const SelectionRect: FC<{ rect: Rect, bgColor?: string }> = ({ rect, bgColor }) => {
-  const bgColorDef = bgColor ?? 'rgb(253 224 71)';
-  return (
-    <div style={{
-      userSelect: 'none',
-      position: 'absolute',
-      top: `${rect.top}px`,
-      left: `${rect.left}px`,
-      width: `${rect.width}px`,
-      height: `${rect.height}px`,
-      backgroundColor: bgColorDef,
-    }}>&nbsp;</div>
-  )
-}
 
 export default ReactTextRange;

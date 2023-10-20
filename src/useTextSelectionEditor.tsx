@@ -1,6 +1,5 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useLayoutEffect, useRef, useState } from 'react';
 import { HandlerPos } from './handler-pos';
-import { Rect } from './rect';
 
 declare global {
   interface Document {
@@ -8,27 +7,50 @@ declare global {
   }
 }
 
-const getHandlerRect = (index: number, node: Node): DOMRect | null => {
-  const range = document.createRange();
-  range.setStart(node, index);
-  range.setEnd(node, index);
-  if (range.getClientRects) {
-    const rects = range.getClientRects();
-    if (rects.length >= 1) {
-      return rects[0];
-    }
-  }
-  return null;
-}
+const getHandlerRect = (node: Node, left: boolean): DOMRect | null => {
+  if (!node || !node.childNodes || node.childNodes.length != 6) return null;
 
-const getAllRects = (node: Node, start: number, end: number) => {
-  const range = document.createRange();
-  range.setStart(node, start);
-  range.setEnd(node, end);
-  if (range.getClientRects) {
-    return range.getClientRects();
+  const headLength = node.childNodes[1].firstChild?.nodeValue?.length!;
+  const selLength = node.childNodes[3].firstChild?.nodeValue?.length!;
+  const tailLength = node.childNodes[5].firstChild?.nodeValue?.length!;
+
+  if (left) {
+    const range = document.createRange();
+    if (selLength > 0) {
+      range.selectNodeContents(node.childNodes[3]);
+    } else if (tailLength > 0) {
+      range.selectNodeContents(node.childNodes[5]);
+    } else {
+      range.setStart(node.childNodes[1].childNodes[0], headLength);
+      range.setEnd(node.childNodes[1].childNodes[0], headLength);
+    }
+    if (range.getClientRects) {
+      const rects = range.getClientRects();
+      if (rects.length >= 1) {
+        return rects[0];
+      }
+    }
+    return null;
+
   } else {
-    return new DOMRectList();
+    const range = document.createRange();
+    if (tailLength > 0) {
+      range.selectNodeContents(node.childNodes[5]);
+    } else if (selLength > 0) {
+      range.setStart(node.childNodes[3].childNodes[0], selLength);
+      range.setEnd(node.childNodes[3].childNodes[0], selLength);
+    } else {
+      range.setStart(node.childNodes[1].childNodes[0], headLength);
+      range.setEnd(node.childNodes[1].childNodes[0], headLength);
+    }
+
+    if (range.getClientRects) {
+      const rects = range.getClientRects();
+      if (rects.length >= 1) {
+        return rects[0];
+      }
+    }
+    return null;
   }
 }
 
@@ -68,12 +90,14 @@ export const useTextSelectionEditor = (
   initLeftPos: number,
   initRightPos: number,
   leftDrag: boolean,
-  rightDrag: boolean
+  rightDrag: boolean,
+  headClass?: string,
+  selectionClass?: string,
+  tailClass?: string,
 ): [
     React.MutableRefObject<HTMLDivElement | null>,
     HandlerPos | null,
-    HandlerPos | null,
-    Rect[] | null] => {
+    HandlerPos | null] => {
 
   // left handler pos
   const [leftHandler, setLeftHandler] = useState<HandlerPos | null>(null);
@@ -85,76 +109,144 @@ export const useTextSelectionEditor = (
 
   const [currentRightPos, setCurrentRightPos] = useState<number>(initRightPos);
 
-  const [rects, setRects] = useState<Rect[] | null>(null);
-
   // reference
   const textDiv = useRef<HTMLDivElement | null>(null);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (textDiv.current) {
       textDiv.current.style.position = 'relative';
     }
   }, [textDiv])
 
+  // break text into three spans
+  useLayoutEffect(() => {
+    let textLeftNode = textDiv.current?.childNodes[0];
+    if (!textLeftNode || textLeftNode.nodeType !== document.TEXT_NODE || textLeftNode.nodeValue === null) {
+      return;
+    }
+
+    const head = document.createRange();
+    head.setStart(textLeftNode, 0);
+    head.setEnd(textLeftNode, currentLeftPos);
+    const headSpan = document.createElement('span');
+    if (headClass) headSpan.classList.value = headClass;
+    head.surroundContents(headSpan);
+
+    textLeftNode = textDiv.current?.childNodes[2];
+    if (!textLeftNode
+      || !textLeftNode.nodeValue
+      || textLeftNode.nodeValue.length < currentRightPos - currentLeftPos) return;
+
+    const selection = document.createRange();
+    selection.setStart(textLeftNode, 0);
+    selection.setEnd(textLeftNode, currentRightPos - currentLeftPos);
+    const selectionSpan = document.createElement('span');
+    if (selectionClass) selectionSpan.classList.value = selectionClass;
+    selection.surroundContents(selectionSpan);
+
+    textLeftNode = textDiv.current?.childNodes[4];
+    if (!textLeftNode) return;
+    const tail = document.createRange();
+    tail.setStart(textLeftNode, 0);
+    tail.setEndAfter(textLeftNode);
+    const tailSpan = document.createElement('span');
+    if (tailClass) tailSpan.classList.value = tailClass;
+    tail.surroundContents(tailSpan);
+
+    return () => {
+      if (textDiv.current) {
+        textDiv.current.childNodes[0].nodeValue = textDiv.current.textContent;
+        while (textDiv.current.childNodes.length > 1 && textDiv.current.lastChild) {
+          textDiv.current.removeChild(textDiv.current.lastChild);
+        }
+      }
+    }
+  }, [textDiv.current]);
+
   // mouse move handler
 
   // left handler
 
-  useEffect(() => {
-    const handlerMove = (e: MouseEvent) => {
-      if (!leftDrag) return;
-      const sm = getNodeAndOffsetFromPoint(e.clientX, e.clientY);
-      if (
-        sm
-        && sm.node === textDiv.current?.childNodes[0]
-        && sm.offset <= currentRightPos
-      ) {
-        setCurrentLeftPos(sm.offset);
-      }
-    };
-    document.addEventListener('mousemove', handlerMove);
-    return () => {
-      document.removeEventListener('mousemove', handlerMove);
-    };
-  }, [leftDrag, currentRightPos]);
+  const leftMoveHandler = useCallback((e: MouseEvent) => {
+    const sm = getNodeAndOffsetFromPoint(e.clientX, e.clientY);
+    if (!sm) return;
 
-  useEffect(() => {
+    let posToSet = currentLeftPos;
+    if (sm.node === textDiv.current?.childNodes[1].firstChild) {
+      posToSet = sm.offset;
+    } else if (sm.node === textDiv.current?.childNodes[3].firstChild) {
+      posToSet = currentLeftPos + sm.offset;
+    }
+    if (posToSet !== currentLeftPos) {
+      const headText = textDiv.current!.childNodes[1].firstChild!.nodeValue!;
+      const selText = textDiv.current!.childNodes[3].firstChild!.nodeValue!;
+      const full = headText + selText;
+      textDiv.current!.childNodes[1].firstChild!.nodeValue = full.substring(0, posToSet);
+      textDiv.current!.childNodes[3].firstChild!.nodeValue = full.substring(posToSet);
+      setCurrentLeftPos(posToSet);
+    }
+  }, [currentLeftPos, textDiv.current]);
+
+  useLayoutEffect(() => {
+    if (!leftDrag) {
+      document.removeEventListener('mousemove', leftMoveHandler);
+    } else {
+      document.addEventListener('mousemove', leftMoveHandler);
+    }
+    return () => {
+      document.removeEventListener('mousemove', leftMoveHandler);
+    };
+  }, [leftDrag, currentLeftPos, textDiv.current]);
+
+  useLayoutEffect(() => {
     setCurrentLeftPos(initLeftPos);
   }, [initLeftPos]);
 
   // right handler
 
-  useEffect(() => {
-    const handlerMove = (e: MouseEvent) => {
-      if (!rightDrag) return;
-      const sm = getNodeAndOffsetFromPoint(e.clientX, e.clientY);
-      if (
-        sm
-        && sm.node === textDiv.current?.childNodes[0]
-        && sm.offset >= currentLeftPos
-      ) {
-        setCurrentRightPos(sm.offset);
-      }
-    };
-    document.addEventListener('mousemove', handlerMove);
-    return () => {
-      document.removeEventListener('mousemove', handlerMove);
-    };
-  }, [rightDrag, currentLeftPos]);
+  const rightMoveHandler = useCallback((e: MouseEvent) => {
+    const sm = getNodeAndOffsetFromPoint(e.clientX, e.clientY);
+    if (!sm) return;
 
-  useEffect(() => {
+    let posToSet = currentRightPos;
+    if (sm.node === textDiv.current?.childNodes[3].firstChild) {
+      posToSet = currentLeftPos + sm.offset;
+    } else if (sm.node === textDiv.current?.childNodes[5].firstChild) {
+      posToSet = currentRightPos + sm.offset;
+    }
+    if (posToSet !== currentRightPos) {
+      const selText = textDiv.current!.childNodes[3].firstChild!.nodeValue!;
+      const tailText = textDiv.current!.childNodes[5].firstChild!.nodeValue!;
+      const full = selText + tailText;
+      textDiv.current!.childNodes[3].firstChild!.nodeValue = full.substring(0, posToSet - currentLeftPos);
+      textDiv.current!.childNodes[5].firstChild!.nodeValue = full.substring(posToSet - currentLeftPos);
+
+      setCurrentRightPos(posToSet);
+    }
+  }, [currentLeftPos, currentRightPos, textDiv.current]);
+
+  useLayoutEffect(() => {
+    if (!rightDrag) {
+      document.removeEventListener('mousemove', rightMoveHandler);
+    } else {
+      document.addEventListener('mousemove', rightMoveHandler);
+    }
+    return () => {
+      document.removeEventListener('mousemove', rightMoveHandler);
+    };
+  }, [rightDrag, currentLeftPos, currentRightPos, textDiv.current]);
+
+  useLayoutEffect(() => {
     setCurrentRightPos(initRightPos);
   }, [initRightPos]);
 
   // draw init left handler
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (textDiv.current
-      && textDiv.current.childNodes.length === 1
-      && textDiv.current.childNodes[0].nodeType === document.TEXT_NODE) {
-      const rect = getHandlerRect(currentLeftPos, textDiv.current.childNodes[0]);
+      && textDiv.current.childNodes.length === 6) {
+      const rect = getHandlerRect(textDiv.current, true);
       if (rect === null) {
         setLeftHandler(null);
-        setRects(null);
       } else {
         const divRect = textDiv.current.getBoundingClientRect();
         setLeftHandler({
@@ -169,14 +261,12 @@ export const useTextSelectionEditor = (
   }, [currentLeftPos]);
 
   // draw init right handler
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (textDiv.current
-      && textDiv.current.childNodes.length === 1
-      && textDiv.current.childNodes[0].nodeType === document.TEXT_NODE) {
-      const rect = getHandlerRect(currentRightPos, textDiv.current.childNodes[0]);
+      && textDiv.current.childNodes.length === 6) {
+      const rect = getHandlerRect(textDiv.current, false);
       if (rect === null) {
         setRightHandler(null);
-        setRects(null);
       } else {
         const divRect = textDiv.current.getBoundingClientRect();
         setRightHandler({
@@ -190,36 +280,6 @@ export const useTextSelectionEditor = (
 
   }, [currentRightPos]);
 
-  useEffect(() => {
-    const n = textDiv.current?.childNodes[0];
-    if (!n) {
-      setRects(null);
-      return;
-    }
-
-    const rawRects = getAllRects(n, currentLeftPos, currentRightPos);
-
-    let rectArray: Rect[] = [];
-
-    if (rawRects && textDiv.current) {
-
-      const divRect = textDiv.current.getBoundingClientRect();
-
-      for (let i = 0; i < rawRects.length; ++i) {
-        const aa = rawRects.item(i);
-        if (aa) rectArray.push({
-          height: aa.height,
-          left: aa.left - divRect.left,
-          top: aa.top - divRect.top,
-          width: aa.width,
-        });
-      }
-    }
-
-    setRects(rectArray);
-
-  }, [currentLeftPos, currentRightPos])
-
   // return
-  return [textDiv, leftHandler, rightHandler, rects];
+  return [textDiv, leftHandler, rightHandler];
 };
