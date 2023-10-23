@@ -10,9 +10,9 @@ declare global {
 const getHandlerRect = (node: Node, left: boolean): DOMRect | null => {
   if (!node || !node.childNodes || node.childNodes.length != 6) return null;
 
-  const headLength = node.childNodes[1].firstChild?.nodeValue?.length!;
-  const selLength = node.childNodes[3].firstChild?.nodeValue?.length!;
-  const tailLength = node.childNodes[5].firstChild?.nodeValue?.length!;
+  const headLength = node.childNodes[1].firstChild?.nodeValue?.length ?? 0;
+  const selLength = node.childNodes[3].firstChild?.nodeValue?.length ?? 0;
+  const tailLength = node.childNodes[5].firstChild?.nodeValue?.length ?? 0;
 
   if (left) {
     const range = document.createRange();
@@ -178,11 +178,20 @@ export const useTextSelectionEditor = (
       posToSet = currentLeftPos + sm.offset;
     }
     if (posToSet !== currentLeftPos) {
-      const headText = textDiv.current!.childNodes[1].firstChild!.nodeValue!;
-      const selText = textDiv.current!.childNodes[3].firstChild!.nodeValue!;
+      const headText = textDiv.current?.childNodes[1]?.firstChild?.nodeValue ?? '';
+      const selText = textDiv.current?.childNodes[3]?.firstChild?.nodeValue ?? '';
       const full = headText + selText;
-      textDiv.current!.childNodes[1].firstChild!.nodeValue = full.substring(0, posToSet);
-      textDiv.current!.childNodes[3].firstChild!.nodeValue = full.substring(posToSet);
+
+      const nodeChild1 = textDiv.current?.childNodes[1]?.firstChild;
+      if (nodeChild1) {
+        nodeChild1.nodeValue = full.substring(0, posToSet);
+      }
+
+      const nodeChild3 = textDiv.current?.childNodes[3]?.firstChild;
+      if (nodeChild3) {
+        nodeChild3.nodeValue = full.substring(posToSet);
+      }
+
       setCurrentLeftPos(posToSet);
     }
   }, [currentLeftPos, textDiv.current]);
@@ -215,11 +224,19 @@ export const useTextSelectionEditor = (
       posToSet = currentRightPos + sm.offset;
     }
     if (posToSet !== currentRightPos) {
-      const selText = textDiv.current!.childNodes[3].firstChild!.nodeValue!;
-      const tailText = textDiv.current!.childNodes[5].firstChild!.nodeValue!;
+      const selText = textDiv.current?.childNodes[3]?.firstChild?.nodeValue ?? '';
+      const tailText = textDiv.current?.childNodes[5]?.firstChild?.nodeValue ?? '';
       const full = selText + tailText;
-      textDiv.current!.childNodes[3].firstChild!.nodeValue = full.substring(0, posToSet - currentLeftPos);
-      textDiv.current!.childNodes[5].firstChild!.nodeValue = full.substring(posToSet - currentLeftPos);
+
+      const nodeChild3 = textDiv.current?.childNodes[3]?.firstChild;
+      if (nodeChild3) {
+        nodeChild3.nodeValue = full.substring(0, posToSet - currentLeftPos);
+      }
+
+      const nodeChild5 = textDiv.current?.childNodes[5]?.firstChild;
+      if (nodeChild5) {
+        nodeChild5.nodeValue = full.substring(posToSet - currentLeftPos);
+      }
 
       setCurrentRightPos(posToSet);
     }
