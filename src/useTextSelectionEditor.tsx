@@ -154,7 +154,7 @@ export const useTextSelectionEditor = (
     tail.surroundContents(tailSpan);
 
     return () => {
-      if (textDiv.current) {
+      if (textDiv.current && textDiv.current.childNodes[0]) {
         textDiv.current.childNodes[0].nodeValue = textDiv.current.textContent;
         while (textDiv.current.childNodes.length > 1 && textDiv.current.lastChild) {
           textDiv.current.removeChild(textDiv.current.lastChild);
