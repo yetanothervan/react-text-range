@@ -59,6 +59,18 @@ interface NodeAndOffset {
   offset: number,
 }
 
+const createTextNodes = (div: HTMLDivElement): void => {
+  if (div.childNodes[1] && !div.childNodes[1].firstChild) {
+    div.childNodes[1].appendChild(document.createTextNode(''));
+  }
+  if (div.childNodes[3] && !div.childNodes[3].firstChild) {
+    div.childNodes[3].appendChild(document.createTextNode(''));
+  }
+  if (div.childNodes[5] && !div.childNodes[5].firstChild) {
+    div.childNodes[5].appendChild(document.createTextNode(''));
+  }
+}
+
 const getNodeAndOffsetFromPoint = (x: number, y: number): NodeAndOffset | null => {
   let range: any;
   let textNode: any;
@@ -170,27 +182,29 @@ export const useTextSelectionEditor = (
   const leftMoveHandler = useCallback((e: MouseEvent) => {
     const sm = getNodeAndOffsetFromPoint(e.clientX, e.clientY);
     if (!sm) return;
+    if (!textDiv.current) return;
 
     let posToSet = currentLeftPos;
-    if (sm.node === textDiv.current?.childNodes[1].firstChild) {
+    if (sm.node === textDiv.current.childNodes[1].firstChild) {
       posToSet = sm.offset;
-    } else if (sm.node === textDiv.current?.childNodes[3].firstChild) {
+    } else if (sm.node === textDiv.current.childNodes[3].firstChild) {
       posToSet = currentLeftPos + sm.offset;
     }
+
     if (posToSet !== currentLeftPos) {
-      const headText = textDiv.current?.childNodes[1]?.firstChild?.nodeValue ?? '';
-      const selText = textDiv.current?.childNodes[3]?.firstChild?.nodeValue ?? '';
+
+      createTextNodes(textDiv.current);
+
+      const headText = textDiv.current.childNodes[1]!.firstChild!.nodeValue!;
+      const selText = textDiv.current.childNodes[3]!.firstChild!.nodeValue!;
       const full = headText + selText;
 
-      const nodeChild1 = textDiv.current?.childNodes[1]?.firstChild;
-      if (nodeChild1) {
-        nodeChild1.nodeValue = full.substring(0, posToSet);
-      }
+      const nodeChild1 = textDiv.current.childNodes[1].firstChild!;
+      nodeChild1.nodeValue = full.substring(0, posToSet);
 
-      const nodeChild3 = textDiv.current?.childNodes[3]?.firstChild;
-      if (nodeChild3) {
-        nodeChild3.nodeValue = full.substring(posToSet);
-      }
+      const nodeChild3 = textDiv.current.childNodes[3].firstChild!;
+      nodeChild3.nodeValue = full.substring(posToSet);
+
 
       setCurrentLeftPos(posToSet);
     }
@@ -216,6 +230,7 @@ export const useTextSelectionEditor = (
   const rightMoveHandler = useCallback((e: MouseEvent) => {
     const sm = getNodeAndOffsetFromPoint(e.clientX, e.clientY);
     if (!sm) return;
+    if (!textDiv.current) return;
 
     let posToSet = currentRightPos;
     if (sm.node === textDiv.current?.childNodes[3].firstChild) {
@@ -224,19 +239,18 @@ export const useTextSelectionEditor = (
       posToSet = currentRightPos + sm.offset;
     }
     if (posToSet !== currentRightPos) {
-      const selText = textDiv.current?.childNodes[3]?.firstChild?.nodeValue ?? '';
-      const tailText = textDiv.current?.childNodes[5]?.firstChild?.nodeValue ?? '';
+
+      createTextNodes(textDiv.current);
+
+      const selText = textDiv.current.childNodes[3].firstChild!.nodeValue!;
+      const tailText = textDiv.current.childNodes[5].firstChild!.nodeValue!;
       const full = selText + tailText;
 
-      const nodeChild3 = textDiv.current?.childNodes[3]?.firstChild;
-      if (nodeChild3) {
-        nodeChild3.nodeValue = full.substring(0, posToSet - currentLeftPos);
-      }
+      const nodeChild3 = textDiv.current.childNodes[3].firstChild!;
+      nodeChild3.nodeValue = full.substring(0, posToSet - currentLeftPos);
 
-      const nodeChild5 = textDiv.current?.childNodes[5]?.firstChild;
-      if (nodeChild5) {
-        nodeChild5.nodeValue = full.substring(posToSet - currentLeftPos);
-      }
+      const nodeChild5 = textDiv.current.childNodes[5].firstChild!;
+      nodeChild5.nodeValue = full.substring(posToSet - currentLeftPos);
 
       setCurrentRightPos(posToSet);
     }
