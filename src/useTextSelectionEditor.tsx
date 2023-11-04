@@ -99,6 +99,7 @@ const getNodeAndOffsetFromPoint = (x: number, y: number): NodeAndOffset | null =
 }
 
 export const useTextSelectionEditor = (
+  text: string,
   initLeftPos: number,
   initRightPos: number,
   leftDrag: boolean,
@@ -128,10 +129,21 @@ export const useTextSelectionEditor = (
     if (textDiv.current) {
       textDiv.current.style.position = 'relative';
     }
-  }, [textDiv])
+  }, [textDiv.current]);
 
   // break text into three spans
   useLayoutEffect(() => {
+
+    if (!textDiv.current) return;
+
+    // remove all nodes
+    while (textDiv.current.childNodes.length > 0 && textDiv.current.lastChild) {
+      textDiv.current.removeChild(textDiv.current.lastChild);
+    }
+
+    const textNode = document.createTextNode(text);
+    textDiv.current.appendChild(textNode);
+
     let textLeftNode = textDiv.current?.childNodes[0];
     if (!textLeftNode || textLeftNode.nodeType !== document.TEXT_NODE || textLeftNode.nodeValue === null) {
       return;
@@ -167,13 +179,12 @@ export const useTextSelectionEditor = (
 
     return () => {
       if (textDiv.current && textDiv.current.childNodes[0]) {
-        textDiv.current.childNodes[0].nodeValue = textDiv.current.textContent;
-        while (textDiv.current.childNodes.length > 1 && textDiv.current.lastChild) {
+        while (textDiv.current.childNodes.length > 0 && textDiv.current.lastChild) {
           textDiv.current.removeChild(textDiv.current.lastChild);
         }
       }
     }
-  }, [textDiv.current]);
+  }, [text]);
 
   // mouse move handler
 
@@ -205,10 +216,9 @@ export const useTextSelectionEditor = (
       const nodeChild3 = textDiv.current.childNodes[3].firstChild!;
       nodeChild3.nodeValue = full.substring(posToSet);
 
-
       setCurrentLeftPos(posToSet);
     }
-  }, [currentLeftPos, textDiv.current]);
+  }, [currentLeftPos, textDiv.current, text]);
 
   useLayoutEffect(() => {
     if (!leftDrag) {
@@ -219,7 +229,7 @@ export const useTextSelectionEditor = (
     return () => {
       document.removeEventListener('mousemove', leftMoveHandler);
     };
-  }, [leftDrag, currentLeftPos, textDiv.current]);
+  }, [leftDrag, currentLeftPos, textDiv.current, text]);
 
   useLayoutEffect(() => {
     setCurrentLeftPos(initLeftPos);
@@ -254,7 +264,7 @@ export const useTextSelectionEditor = (
 
       setCurrentRightPos(posToSet);
     }
-  }, [currentLeftPos, currentRightPos, textDiv.current]);
+  }, [currentLeftPos, currentRightPos, textDiv.current, text]);
 
   useLayoutEffect(() => {
     if (!rightDrag) {
@@ -265,7 +275,7 @@ export const useTextSelectionEditor = (
     return () => {
       document.removeEventListener('mousemove', rightMoveHandler);
     };
-  }, [rightDrag, currentLeftPos, currentRightPos, textDiv.current]);
+  }, [rightDrag, currentLeftPos, currentRightPos, textDiv.current, text]);
 
   useLayoutEffect(() => {
     setCurrentRightPos(initRightPos);

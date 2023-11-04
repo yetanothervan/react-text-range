@@ -13,10 +13,10 @@ export interface RangeState {
 }
 
 export const ReactTextRange: FC<{
+  text: string;
   initLeftPos: number;
   initRightPos: number,
   Container: TextContainer,
-  children: string,
   onChange: (state: RangeState) => void,
   props?: React.CSSProperties,
   className?: string,
@@ -30,7 +30,7 @@ export const ReactTextRange: FC<{
   initLeftPos,
   initRightPos,
   Container,
-  children,
+  text,
   onChange,
   props,
   handlerWidth,
@@ -47,7 +47,7 @@ export const ReactTextRange: FC<{
     const [mouseOnRight, setMouseOnRight] = useState<boolean>(false);
 
     const [textDiv, leftHandler, rightHandler] =
-      useTextSelectionEditor(initLeftPos, initRightPos, mouseOnLeft, mouseOnRight, headClass, selectionClass, tailClass);
+      useTextSelectionEditor(text, initLeftPos, initRightPos, mouseOnLeft, mouseOnRight, headClass, selectionClass, tailClass);
 
     useEffect(() => {
       if (leftHandler && rightHandler) {
@@ -67,9 +67,7 @@ export const ReactTextRange: FC<{
           ...props
         }}
       >
-        <Container ref={textDiv}>
-          {children}
-        </Container>
+        <Container ref={textDiv}>{text}</Container>
         <SelectionHandler className={leftHandlerClass} width={handlerWidth} grab={mouseOnLeft} left={true} pos={leftHandler} setGrab={(v) => setMouseOnLeft(v)} />
         <SelectionHandler className={rightHandlerClass} width={handlerWidth} grab={mouseOnRight} left={false} pos={rightHandler} setGrab={(v) => setMouseOnRight(v)} />
       </div>
