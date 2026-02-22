@@ -1,4 +1,4 @@
-import { FC, useEffect, useState } from 'react';
+import { FC, useEffect, useRef, useState } from 'react';
 import { useTextSelectionEditor } from './useTextSelectionEditor';
 import { SelectionHandler } from './SelectionHandler';
 import React from 'react';
@@ -49,9 +49,13 @@ export const ReactTextRange: FC<{
     const [textDiv, leftHandler, rightHandler] =
       useTextSelectionEditor(text, initLeftPos, initRightPos, mouseOnLeft, mouseOnRight, headClass, selectionClass, tailClass);
 
+    // Fix 7: use ref to always call the latest onChange without adding it to deps
+    const onChangeRef = useRef(onChange);
+    onChangeRef.current = onChange;
+
     useEffect(() => {
       if (leftHandler && rightHandler) {
-        onChange({
+        onChangeRef.current({
           left: leftHandler.pos,
           right: rightHandler.pos,
         })

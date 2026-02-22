@@ -1,28 +1,54 @@
 import React, { useCallback, useLayoutEffect, useRef, useState } from 'react';
 import { HandlerPos } from './handler-pos';
 
+// Fix 11: proper typing for caretPositionFromPoint (CSSOM View spec)
+interface CaretPosition {
+  readonly offsetNode: Node;
+  readonly offset: number;
+  getClientRect(): DOMRect | null;
+}
+
 declare global {
   interface Document {
-    caretPositionFromPoint: any;
+    caretPositionFromPoint(x: number, y: number): CaretPosition | null;
   }
 }
 
-const getHandlerRect = (node: Node, left: boolean): DOMRect | null => {
-  if (!node || !node.childNodes || node.childNodes.length != 6) return null;
+// Fix 9: named constants for DOM child node structure
+// After surroundContents: [text][span:head][text][span:selection][text][span:tail]
+const EXPECTED_CHILD_COUNT = 6;
+const NODE = { HEAD: 1, SEL: 3, TAIL: 5 } as const;
 
-  const headLength = node.childNodes[1].firstChild?.nodeValue?.length ?? 0;
-  const selLength = node.childNodes[3].firstChild?.nodeValue?.length ?? 0;
-  const tailLength = node.childNodes[5].firstChild?.nodeValue?.length ?? 0;
+// Fix 2: position clamping utility
+const clampPositions = (left: number, right: number, textLen: number): [number, number] => {
+  const clampedLeft = Math.max(0, Math.min(left, textLen));
+  const clampedRight = Math.max(clampedLeft, Math.min(right, textLen));
+  return [clampedLeft, clampedRight];
+};
+
+// Fix 8: shallow equality for HandlerPos to avoid unnecessary re-renders
+const handlerPosEqual = (a: HandlerPos | null, b: HandlerPos | null): boolean => {
+  if (a === b) return true;
+  if (a === null || b === null) return false;
+  return a.height === b.height && a.left === b.left && a.top === b.top && a.pos === b.pos;
+};
+
+const getHandlerRect = (node: Node, left: boolean): DOMRect | null => {
+  if (!node || !node.childNodes || node.childNodes.length !== EXPECTED_CHILD_COUNT) return null;
+
+  const headLength = node.childNodes[NODE.HEAD].firstChild?.nodeValue?.length ?? 0;
+  const selLength = node.childNodes[NODE.SEL].firstChild?.nodeValue?.length ?? 0;
+  const tailLength = node.childNodes[NODE.TAIL].firstChild?.nodeValue?.length ?? 0;
 
   if (left) {
     const range = document.createRange();
     if (selLength > 0) {
-      range.selectNodeContents(node.childNodes[3]);
+      range.selectNodeContents(node.childNodes[NODE.SEL]);
     } else if (tailLength > 0) {
-      range.selectNodeContents(node.childNodes[5]);
+      range.selectNodeContents(node.childNodes[NODE.TAIL]);
     } else {
-      range.setStart(node.childNodes[1].childNodes[0], headLength);
-      range.setEnd(node.childNodes[1].childNodes[0], headLength);
+      range.setStart(node.childNodes[NODE.HEAD].childNodes[0], headLength);
+      range.setEnd(node.childNodes[NODE.HEAD].childNodes[0], headLength);
     }
     if (range.getClientRects) {
       const rects = range.getClientRects();
@@ -35,13 +61,13 @@ const getHandlerRect = (node: Node, left: boolean): DOMRect | null => {
   } else {
     const range = document.createRange();
     if (tailLength > 0) {
-      range.selectNodeContents(node.childNodes[5]);
+      range.selectNodeContents(node.childNodes[NODE.TAIL]);
     } else if (selLength > 0) {
-      range.setStart(node.childNodes[3].childNodes[0], selLength);
-      range.setEnd(node.childNodes[3].childNodes[0], selLength);
+      range.setStart(node.childNodes[NODE.SEL].childNodes[0], selLength);
+      range.setEnd(node.childNodes[NODE.SEL].childNodes[0], selLength);
     } else {
-      range.setStart(node.childNodes[1].childNodes[0], headLength);
-      range.setEnd(node.childNodes[1].childNodes[0], headLength);
+      range.setStart(node.childNodes[NODE.HEAD].childNodes[0], headLength);
+      range.setEnd(node.childNodes[NODE.HEAD].childNodes[0], headLength);
     }
 
     if (range.getClientRects) {
@@ -60,40 +86,32 @@ interface NodeAndOffset {
 }
 
 const createTextNodes = (div: HTMLDivElement): void => {
-  if (div.childNodes[1] && !div.childNodes[1].firstChild) {
-    div.childNodes[1].appendChild(document.createTextNode(''));
+  if (div.childNodes[NODE.HEAD] && !div.childNodes[NODE.HEAD].firstChild) {
+    div.childNodes[NODE.HEAD].appendChild(document.createTextNode(''));
   }
-  if (div.childNodes[3] && !div.childNodes[3].firstChild) {
-    div.childNodes[3].appendChild(document.createTextNode(''));
+  if (div.childNodes[NODE.SEL] && !div.childNodes[NODE.SEL].firstChild) {
+    div.childNodes[NODE.SEL].appendChild(document.createTextNode(''));
   }
-  if (div.childNodes[5] && !div.childNodes[5].firstChild) {
-    div.childNodes[5].appendChild(document.createTextNode(''));
+  if (div.childNodes[NODE.TAIL] && !div.childNodes[NODE.TAIL].firstChild) {
+    div.childNodes[NODE.TAIL].appendChild(document.createTextNode(''));
   }
 }
 
+// Fix 11: proper types, null check on caretPositionFromPoint result
 const getNodeAndOffsetFromPoint = (x: number, y: number): NodeAndOffset | null => {
-  let range: any;
-  let textNode: any;
-  let offset: any;
-
   if (document.caretPositionFromPoint) {
-    range = document.caretPositionFromPoint(x, y);
-    textNode = range.offsetNode;
-    offset = range.offset;
-  } else if (document.caretRangeFromPoint) {
-    range = document.caretRangeFromPoint(x, y);
-    if (range) {
-      textNode = range.startContainer;
-      offset = range.startOffset;
+    const caretPos = document.caretPositionFromPoint(x, y);
+    if (!caretPos) return null;
+    if (caretPos.offsetNode?.nodeType === document.TEXT_NODE && !Number.isNaN(caretPos.offset)) {
+      return { node: caretPos.offsetNode, offset: caretPos.offset };
     }
-  } else {
     return null;
-  }
-
-  if (textNode?.nodeType === document.TEXT_NODE) {
-    if (!Number.isNaN(offset)) {
-      return { node: textNode, offset };
+  } else if (document.caretRangeFromPoint) {
+    const range = document.caretRangeFromPoint(x, y);
+    if (range && range.startContainer?.nodeType === document.TEXT_NODE && !Number.isNaN(range.startOffset)) {
+      return { node: range.startContainer, offset: range.startOffset };
     }
+    return null;
   }
   return null;
 }
@@ -112,29 +130,49 @@ export const useTextSelectionEditor = (
     HandlerPos | null,
     HandlerPos | null] => {
 
+  // Fix 10: SSR guard — useLayoutEffect won't run on server,
+  // but we still return safe defaults at the bottom
+  const isSSR = typeof document === 'undefined';
+
   // left handler pos
   const [leftHandler, setLeftHandler] = useState<HandlerPos | null>(null);
 
-  const [currentLeftPos, setCurrentLeftPos] = useState<number>(initLeftPos);
+  // Fix 2: clamp initial values
+  const [currentLeftPos, setCurrentLeftPos] = useState<number>(() => {
+    const [cl] = clampPositions(initLeftPos, initRightPos, text.length);
+    return cl;
+  });
 
   // right handler pos
   const [rightHandler, setRightHandler] = useState<HandlerPos | null>(null);
 
-  const [currentRightPos, setCurrentRightPos] = useState<number>(initRightPos);
+  const [currentRightPos, setCurrentRightPos] = useState<number>(() => {
+    const [, cr] = clampPositions(initLeftPos, initRightPos, text.length);
+    return cr;
+  });
 
   // reference
   const textDiv = useRef<HTMLDivElement | null>(null);
 
+  // Fix 6: empty deps — ref is set after first render, useLayoutEffect runs after that
   useLayoutEffect(() => {
     if (textDiv.current) {
       textDiv.current.style.position = 'relative';
     }
-  }, [textDiv.current]);
+  }, []);
 
-  // break text into three spans
+  // Break text into three spans
+  // Fix 1: depend on props (initLeftPos/initRightPos) so DOM rebuilds when props change
+  // Fix 2: clamp positions before Range operations
   useLayoutEffect(() => {
-
+    if (isSSR) return;
     if (!textDiv.current) return;
+
+    const [clampedLeft, clampedRight] = clampPositions(initLeftPos, initRightPos, text.length);
+
+    // Sync internal state to clamped prop values
+    setCurrentLeftPos(clampedLeft);
+    setCurrentRightPos(clampedRight);
 
     // remove all nodes
     while (textDiv.current.childNodes.length > 0 && textDiv.current.lastChild) {
@@ -151,7 +189,7 @@ export const useTextSelectionEditor = (
 
     const head = document.createRange();
     head.setStart(textLeftNode, 0);
-    head.setEnd(textLeftNode, currentLeftPos);
+    head.setEnd(textLeftNode, clampedLeft);
     const headSpan = document.createElement('span');
     if (headClass) headSpan.classList.value = headClass;
     head.surroundContents(headSpan);
@@ -159,11 +197,11 @@ export const useTextSelectionEditor = (
     textLeftNode = textDiv.current?.childNodes[2];
     if (!textLeftNode
       || !textLeftNode.nodeValue
-      || textLeftNode.nodeValue.length < currentRightPos - currentLeftPos) return;
+      || textLeftNode.nodeValue.length < clampedRight - clampedLeft) return;
 
     const selection = document.createRange();
     selection.setStart(textLeftNode, 0);
-    selection.setEnd(textLeftNode, currentRightPos - currentLeftPos);
+    selection.setEnd(textLeftNode, clampedRight - clampedLeft);
     const selectionSpan = document.createElement('span');
     if (selectionClass) selectionSpan.classList.value = selectionClass;
     selection.surroundContents(selectionSpan);
@@ -184,42 +222,49 @@ export const useTextSelectionEditor = (
         }
       }
     }
-  }, [text]);
+  }, [text, initLeftPos, initRightPos, headClass, selectionClass, tailClass]);
 
-  // mouse move handler
+  // left handler drag
 
-  // left handler
-
+  // Fix 4: null checks instead of non-null assertions
+  // Fix 6: remove textDiv.current from deps
   const leftMoveHandler = useCallback((e: MouseEvent) => {
     const sm = getNodeAndOffsetFromPoint(e.clientX, e.clientY);
     if (!sm) return;
     if (!textDiv.current) return;
+    if (textDiv.current.childNodes.length !== EXPECTED_CHILD_COUNT) return;
 
     let posToSet = currentLeftPos;
-    if (sm.node === textDiv.current.childNodes[1].firstChild) {
+    if (sm.node === textDiv.current.childNodes[NODE.HEAD].firstChild) {
       posToSet = sm.offset;
-    } else if (sm.node === textDiv.current.childNodes[3].firstChild) {
+    } else if (sm.node === textDiv.current.childNodes[NODE.SEL].firstChild) {
       posToSet = currentLeftPos + sm.offset;
     }
+
+    // Fix 2: clamp left pos to [0, currentRightPos]
+    posToSet = Math.max(0, Math.min(posToSet, currentRightPos));
 
     if (posToSet !== currentLeftPos) {
 
       createTextNodes(textDiv.current);
 
-      const headText = textDiv.current.childNodes[1]!.firstChild!.nodeValue!;
-      const selText = textDiv.current.childNodes[3]!.firstChild!.nodeValue!;
-      const full = headText + selText;
+      // Fix 4: null checks
+      const headTextNode = textDiv.current.childNodes[NODE.HEAD]?.firstChild;
+      const selTextNode = textDiv.current.childNodes[NODE.SEL]?.firstChild;
+      if (!headTextNode || !selTextNode
+          || headTextNode.nodeValue === null || selTextNode.nodeValue === null) {
+        return;
+      }
 
-      const nodeChild1 = textDiv.current.childNodes[1].firstChild!;
-      nodeChild1.nodeValue = full.substring(0, posToSet);
-
-      const nodeChild3 = textDiv.current.childNodes[3].firstChild!;
-      nodeChild3.nodeValue = full.substring(posToSet);
+      const full = headTextNode.nodeValue + selTextNode.nodeValue;
+      headTextNode.nodeValue = full.substring(0, posToSet);
+      selTextNode.nodeValue = full.substring(posToSet);
 
       setCurrentLeftPos(posToSet);
     }
-  }, [currentLeftPos, textDiv.current, text]);
+  }, [currentLeftPos, currentRightPos, text]);
 
+  // Fix 6: depend on leftMoveHandler identity (which changes when its deps change)
   useLayoutEffect(() => {
     if (!leftDrag) {
       document.removeEventListener('mousemove', leftMoveHandler);
@@ -229,43 +274,49 @@ export const useTextSelectionEditor = (
     return () => {
       document.removeEventListener('mousemove', leftMoveHandler);
     };
-  }, [leftDrag, currentLeftPos, textDiv.current, text]);
+  }, [leftDrag, leftMoveHandler]);
 
-  useLayoutEffect(() => {
-    setCurrentLeftPos(initLeftPos);
-  }, [initLeftPos]);
+  // right handler drag
 
-  // right handler
-
+  // Fix 4: null checks instead of non-null assertions
+  // Fix 6: remove textDiv.current from deps
   const rightMoveHandler = useCallback((e: MouseEvent) => {
     const sm = getNodeAndOffsetFromPoint(e.clientX, e.clientY);
     if (!sm) return;
     if (!textDiv.current) return;
+    if (textDiv.current.childNodes.length !== EXPECTED_CHILD_COUNT) return;
 
     let posToSet = currentRightPos;
-    if (sm.node === textDiv.current?.childNodes[3].firstChild) {
+    if (sm.node === textDiv.current.childNodes[NODE.SEL].firstChild) {
       posToSet = currentLeftPos + sm.offset;
-    } else if (sm.node === textDiv.current?.childNodes[5].firstChild) {
+    } else if (sm.node === textDiv.current.childNodes[NODE.TAIL].firstChild) {
       posToSet = currentRightPos + sm.offset;
     }
+
+    // Fix 2: clamp right pos to [currentLeftPos, text.length]
+    posToSet = Math.max(currentLeftPos, Math.min(posToSet, text.length));
+
     if (posToSet !== currentRightPos) {
 
       createTextNodes(textDiv.current);
 
-      const selText = textDiv.current.childNodes[3].firstChild!.nodeValue!;
-      const tailText = textDiv.current.childNodes[5].firstChild!.nodeValue!;
-      const full = selText + tailText;
+      // Fix 4: null checks
+      const selTextNode = textDiv.current.childNodes[NODE.SEL]?.firstChild;
+      const tailTextNode = textDiv.current.childNodes[NODE.TAIL]?.firstChild;
+      if (!selTextNode || !tailTextNode
+          || selTextNode.nodeValue === null || tailTextNode.nodeValue === null) {
+        return;
+      }
 
-      const nodeChild3 = textDiv.current.childNodes[3].firstChild!;
-      nodeChild3.nodeValue = full.substring(0, posToSet - currentLeftPos);
-
-      const nodeChild5 = textDiv.current.childNodes[5].firstChild!;
-      nodeChild5.nodeValue = full.substring(posToSet - currentLeftPos);
+      const full = selTextNode.nodeValue + tailTextNode.nodeValue;
+      selTextNode.nodeValue = full.substring(0, posToSet - currentLeftPos);
+      tailTextNode.nodeValue = full.substring(posToSet - currentLeftPos);
 
       setCurrentRightPos(posToSet);
     }
-  }, [currentLeftPos, currentRightPos, textDiv.current, text]);
+  }, [currentLeftPos, currentRightPos, text]);
 
+  // Fix 6: depend on rightMoveHandler identity
   useLayoutEffect(() => {
     if (!rightDrag) {
       document.removeEventListener('mousemove', rightMoveHandler);
@@ -275,52 +326,56 @@ export const useTextSelectionEditor = (
     return () => {
       document.removeEventListener('mousemove', rightMoveHandler);
     };
-  }, [rightDrag, currentLeftPos, currentRightPos, textDiv.current, text]);
+  }, [rightDrag, rightMoveHandler]);
 
-  useLayoutEffect(() => {
-    setCurrentRightPos(initRightPos);
-  }, [initRightPos]);
-
-  // draw init left handler
+  // draw left handler position
+  // Fix 8: shallow equality check before setting state
   useLayoutEffect(() => {
     if (textDiv.current
-      && textDiv.current.childNodes.length === 6) {
+      && textDiv.current.childNodes.length === EXPECTED_CHILD_COUNT) {
       const rect = getHandlerRect(textDiv.current, true);
       if (rect === null) {
-        setLeftHandler(null);
+        setLeftHandler(prev => prev === null ? prev : null);
       } else {
         const divRect = textDiv.current.getBoundingClientRect();
-        setLeftHandler({
+        const newPos: HandlerPos = {
           height: rect.height,
           left: rect.left - divRect.left,
           top: rect.top - divRect.top,
           pos: currentLeftPos,
-        });
+        };
+        setLeftHandler(prev => handlerPosEqual(prev, newPos) ? prev : newPos);
       }
     }
 
   }, [currentLeftPos]);
 
-  // draw init right handler
+  // draw right handler position
+  // Fix 8: shallow equality check before setting state
   useLayoutEffect(() => {
     if (textDiv.current
-      && textDiv.current.childNodes.length === 6) {
+      && textDiv.current.childNodes.length === EXPECTED_CHILD_COUNT) {
       const rect = getHandlerRect(textDiv.current, false);
       if (rect === null) {
-        setRightHandler(null);
+        setRightHandler(prev => prev === null ? prev : null);
       } else {
         const divRect = textDiv.current.getBoundingClientRect();
-        setRightHandler({
+        const newPos: HandlerPos = {
           height: rect.height,
           left: rect.left - divRect.left,
           top: rect.top - divRect.top,
           pos: currentRightPos,
-        });
+        };
+        setRightHandler(prev => handlerPosEqual(prev, newPos) ? prev : newPos);
       }
     }
 
   }, [currentRightPos]);
 
-  // return
+  // Fix 10: return safe defaults for SSR
+  if (isSSR) {
+    return [textDiv, null, null];
+  }
+
   return [textDiv, leftHandler, rightHandler];
 };
